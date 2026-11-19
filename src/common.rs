@@ -2515,7 +2515,12 @@ pub fn rustdesk_interval(i: Interval) -> ThrottledInterval {
     ThrottledInterval::new(i)
 }
 
+/// Brand name of this build. Used for window titles, install paths, service
+/// names and config folders. Keep it free of spaces.
+pub const BRAND_APP_NAME: &str = "PogotowieZdalne";
+
 pub fn load_custom_client() {
+    *config::APP_NAME.write().unwrap() = BRAND_APP_NAME.to_owned();
     #[cfg(debug_assertions)]
     if let Ok(data) = std::fs::read_to_string("./custom.txt") {
         read_custom_client(data.trim());

@@ -1,0 +1,50 @@
+name: Rename release assets
+
+# Renames release files from rustdesk* to PogotowieZdalne* after a build.
+# When both names exist, the newer upload wins and the older one is deleted.
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag
+        type: string
+        default: nightly
+
+jobs:
+  rename:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Rename assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_id=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq .id)
+          assets=$(gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases/$release_id/assets?per_page=100" | jq 'add')
+          jq -r '.[] | select(.name | startswith("rustdesk")) | "\(.id) \(.updated_at) \(.name)"' <<<"$assets" |
+          while read -r id updated name; do
+            target="PogotowieZdalne${name#rustdesk}"
+            existing=$(jq -r --arg t "$target" '.[] | select(.name == $t) | "\(.id) \(.updated_at)"' <<<"$assets")
+            if [ -n "$existing" ]; then
+              read -r existing_id existing_updated <<<"$existing"
+              if [[ "$existing_updated" > "$updated" ]]; then
+                echo "Deleting older $name (newer $target exists)"
+                gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$id"
+                continue
+              fi
+              echo "Replacing older $target"
+              gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$existing_id"
+            fi
+            echo "$name -> $target"
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/assets/$id" -f name="$target" >/dev/null
+          done

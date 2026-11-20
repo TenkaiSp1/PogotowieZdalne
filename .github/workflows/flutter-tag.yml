@@ -20,3 +20,12 @@ jobs:
       upload-artifact: true
       upload-tag: ${{ github.ref_name }}
       publish-update-metadata: ${{ github.repository == 'rustdesk/rustdesk' }}
+
+  rename-release-assets:
+    needs: [run-flutter-tag-build]
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: write
+    uses: ./.github/workflows/rename-release-assets.yml
+    with:
+      tag: ${{ github.ref_name }}
